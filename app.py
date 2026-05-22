@@ -1,4 +1,47 @@
 import streamlit as st
+from supabase import create_client
+
+# 1. Conexión segura (Streamlit busca automáticamente lo que guardaste en el Paso 1)
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase = create_client(url, key)
+
+st.title("Mi Aplicación con Login")
+
+# 2. Menú para registrarse o iniciar sesión
+menu = ["Iniciar Sesión", "Registrarse"]
+opcion = st.sidebar.selectbox("Menú de Acceso", menu)
+
+if opcion == "Registrarse":
+    st.subheader("Crea una cuenta nueva")
+    correo = st.text_input("Tu Correo")
+    clave = st.text_input("Tu Contraseña", type="password")
+    
+    if st.button("Crear cuenta"):
+        try:
+            user = supabase.auth.sign_up({"email": correo, "password": clave})
+            st.success("¡Cuenta creada! Te llegará un correo de confirmación.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+elif opcion == "Iniciar Sesión":
+    st.subheader("Ingresa a tu cuenta")
+    correo = st.text_input("Correo")
+    clave = st.text_input("Contraseña", type="password")
+    
+    if st.button("Entrar"):
+        try:
+            session = supabase.auth.sign_in_with_password({"email": correo, "password": clave})
+            st.success("¡Has iniciado sesión con éxito!")
+            st.session_state["user_id"] = session.user.id
+            
+            # --- AQUÍ ABAJO COMIENZA TU CÓDIGO ACTUAL ---
+            st.write("¡Aquí va tu app original para procesar datos!")
+            
+        except Exception as e:
+            st.error("Correo o contraseña incorrectos.")
+            
+import streamlit as st
 import pandas as pd
 import numpy as np
 import os, io, re
@@ -7,14 +50,12 @@ from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side)
 from openpyxl.utils import get_column_letter
 
 st.set_page_config(
-    page_title="Diseño Hidráulico Pro",
+    page_title="Diseño Hidráulico",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# ══════════════════════════════════════════════════════════════════════════════
 # OCULTAR DEPLOY Y MENÚ
-# ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden !important;}
@@ -25,9 +66,7 @@ footer {visibility: hidden !important;}
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
 # ESTILOS GLOBALES
-# ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Exo+2:ital,wght@0,300;0,400;0,500;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">', unsafe_allow_html=True)
 
 st.markdown("""
@@ -146,9 +185,7 @@ label, [data-testid="stWidgetLabel"] p {
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HEADER
-# ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div style="background:linear-gradient(135deg,#1e3a6e 0%,#2a5aaa 50%,#1a3060 100%);
   border-bottom:2px solid #1a56b0;padding:22px 36px 18px;border-radius:6px;margin-bottom:0;">
@@ -167,9 +204,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
 # CARGA DE DATOS
-# ══════════════════════════════════════════════════════════════════════════════
 @st.cache_data
 def cargar_datos():
     df_agua = pd.read_excel("datos.xlsx", sheet_name="PropiedadesAgua", decimal=',')
@@ -184,9 +219,7 @@ def cargar_datos():
 
 df_agua, df_rug, df_tubo = cargar_datos()
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SESSION STATE
-# ══════════════════════════════════════════════════════════════════════════════
 if 'lista_resultados' not in st.session_state:
     st.session_state.lista_resultados = []
 if 'go_to_tab' not in st.session_state:
@@ -200,9 +233,7 @@ if st.session_state.go_to_tab == 1:
     jump_to_tab(1)
     st.session_state.go_to_tab = None
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 def safe_sheet_name(name: str, max_len: int = 31) -> str:
     return re.sub(r'[\\/*?:\[\]/]', '-', name)[:max_len]
 
@@ -256,9 +287,7 @@ def calcular(nombre_tubo, material, rugosidad, diametro, area, caudal_ls, longit
         "K_HW": K_HW, "Hf_HW": Hf_HW, "K_DW": K_DW, "Hf_DW": Hf_DW,
     }
 
-# ══════════════════════════════════════════════════════════════════════════════
 # EXCEL — recibe datos_editados para incluirlos en la exportación
-# ══════════════════════════════════════════════════════════════════════════════
 def _border(color="8EAADB"):
     s = Side(style='thin', color=color)
     return Border(left=s, right=s, top=s, bottom=s)
@@ -503,10 +532,7 @@ def build_excel(lista: list, datos_editados: dict) -> bytes:
     wb.save(buf)
     return buf.getvalue()
 
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PDF — recibe datos_editados
-# ══════════════════════════════════════════════════════════════════════════════
 def build_pdf(lista: list, datos_editados: dict) -> bytes:
     try:
         from reportlab.lib.pagesizes import A4, landscape
@@ -710,15 +736,10 @@ def build_pdf(lista: list, datos_editados: dict) -> bytes:
     doc.build(story)
     return buf.getvalue()
 
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PESTAÑAS
-# ══════════════════════════════════════════════════════════════════════════════
 tabs = st.tabs(["  DATOS INICIALES","  DATOS DE ENTRADA","  RESULTADOS","  HOJA DE RESUMEN"])
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # TAB 0
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with tabs[0]:
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
     col_img, col_ctrl = st.columns([1, 2], gap="large")
@@ -756,9 +777,7 @@ with tabs[0]:
             st.info("Coloca 'Imagen2.png' en el directorio del proyecto.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # TAB 1
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with tabs[1]:
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
 
@@ -837,9 +856,7 @@ with tabs[1]:
             else:
                 st.info("Todas las combinaciones ya estaban procesadas.")
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # TAB 2
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with tabs[2]:
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
 
@@ -959,9 +976,7 @@ with tabs[2]:
             if st.button("🖨  Imprimir página", use_container_width=True):
                 st.components.v1.html("<script>window.parent.window.print();</script>", height=0)
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # TAB 3
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with tabs[3]:
     st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
     lista=st.session_state.lista_resultados
